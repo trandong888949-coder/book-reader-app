@@ -5,7 +5,6 @@ import time
 import json
 
 st.set_page_config(page_title="Công cụ Đọc Hiểu Sách", page_icon="📚", layout="wide")
-
 st.title("📚 Công Cụ Kiểm Tra Đọc Hiểu Sách")
 st.markdown("Upload file PDF và AI sẽ tạo câu hỏi kiểm tra mức độ hiểu của bạn!")
 
@@ -28,19 +27,14 @@ def read_pdf(uploaded_file):
     return text
 
 def generate_questions_real(text_content, num_questions=3, difficulty="medium"):
-    prompt = '''Dựa vào nội dung sau, hãy tạo ''' + str(num_questions) + ''' câu hỏi trắc nghiệm mức độ ''' + difficulty + '''.
-
-Nội dung:
-''' + text_content[:3000] + '''
-
-Yêu cầu:
-- Tạo CHÍNH XÁC ''' + str(num_questions) + ''' câu hỏi trắc nghiệm
-- Mỗi câu có 4 đáp án (A, B, C, D)
-- Mức độ: ''' + difficulty + '''
-- Trả về format JSON (KHÔNG thêm markdown):
-[
-  {"question": "Câu hỏi?", "options": {"A": "Đáp án A", "B": "Đáp án B", "C": "Đáp án C", "D": "Đáp án D"}, "correct_answer": "A", "explanation": "Giải thích"}
-]'''
+    prompt = "Dựa vào nội dung sau, hãy tạo " + str(num_questions) + " câu hỏi trắc nghiệm mức độ " + difficulty + ".\n\n"
+    prompt += "Nội dung:\n" + text_content[:3000] + "\n\n"
+    prompt += "Yêu cầu:\n"
+    prompt += "- Tạo CHÍNH XÁC " + str(num_questions) + " câu hỏi trắc nghiệm\n"
+    prompt += "- Mỗi câu có 4 đáp án (A, B, C, D)\n"
+    prompt += "- Mức độ: " + difficulty + "\n"
+    prompt += "- Trả về CHÍNH XÁC format JSON này (KHÔNG thêm text khác):\n"
+    prompt += '[{"question": "Câu hỏi?", "options": {"A": "Đáp án A", "B": "Đáp án B", "C": "Đáp án C", "D": "Đáp án D"}, "correct_answer": "A", "explanation": "Giải thích"}]'
     
     try:
         with st.spinner("⏳ Đợi 60 giây để tránh vượt quota API..."):
@@ -48,13 +42,20 @@ Yêu cầu:
         model = genai.GenerativeModel("models/gemini-2.5-pro")
         response = model.generate_content(prompt)
         response_text = response.text.strip()
-        if response_text.startswith("```
-            lines = response_text.split("\n")
-            response_text = "\n".join(lines[1:-1])
-        questions = json.loads(response_text)
-        return questions
+        
+        # Tìm JSON trong response
+        start = response_text.find('[')
+        end = response_text.rfind(']') + 1
+        if start >= 0 and end > start:
+            json_text = response_text[start:end]
+            questions = json.loads(json_text)
+            return questions
+        else:
+            questions = json.loads(response_text)
+            return questions
     except Exception as e:
         st.error(f"❌ Lỗi: {e}")
+        st.error(f"Response: {response_text if 'response_text' in locals() else 'N/A'}")
         return None
 
 uploaded_file = st.file_uploader("📄 Upload file PDF", type=['pdf'])
